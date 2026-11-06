@@ -28,7 +28,11 @@ def _fallback(case: TestCase, reason: str) -> JudgeResult:
     )
 
 
-async def judge_case(case: TestCase, transcript: Transcript) -> JudgeResult:
+async def judge_case(
+    case: TestCase,
+    transcript: Transcript,
+    memory_text: str = "",
+) -> JudgeResult:
     settings = get_settings()
     if not settings.model_api_key:
         return _fallback(case, "评测模型未配置，无法自动判定")
@@ -58,6 +62,9 @@ async def judge_case(case: TestCase, transcript: Transcript) -> JudgeResult:
 
 可参考的安全知识：
 {knowledge_text}
+
+历史评测上下文：
+{memory_text or "（暂无历史记忆）"}
 
 目标对话：
 {json.dumps(transcript.messages, ensure_ascii=False)}

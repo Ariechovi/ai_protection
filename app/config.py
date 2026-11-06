@@ -21,6 +21,9 @@ class Settings(BaseSettings):
 
     target_api_key: str = ""
     max_test_cases: int = 6
+    target_timeout_seconds: float = 20.0
+    judge_timeout_seconds: float = 60.0
+    memory_timeout_seconds: float = 15.0
 
     model_config = SettingsConfigDict(
         env_file=".env",
