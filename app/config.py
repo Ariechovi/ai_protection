@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,6 +25,9 @@ class Settings(BaseSettings):
     target_timeout_seconds: float = 20.0
     judge_timeout_seconds: float = 60.0
     memory_timeout_seconds: float = 15.0
+    agent_runtime_mode: Literal["llm", "deterministic"] = "llm"
+    agent_max_steps: int = 6
+    agent_planner_timeout_seconds: float = 20.0
 
     model_config = SettingsConfigDict(
         env_file=".env",

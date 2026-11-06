@@ -14,6 +14,7 @@
 - 通过 SSE 推送测试进度
 - 保存测试运行和结果到 PostgreSQL
 - 使用 Redis 短期事件、上一次运行摘要和 pgvector 长期目标画像辅助 Judge
+- 使用 LangGraph 有界 Agent 规划白名单用例的顺序，并循环执行、判定和持久化
 
 当前已验证：
 
@@ -30,7 +31,11 @@
   pgvector 保存跨运行目标画像；记忆统一加入 Judge Prompt。
 - A2 记忆故障按辅助功能降级：Redis socket 超时 2 秒，单次记忆加载/写入默认最多
   15 秒，不阻断正式目标测试和结果落库。
-- A1/A2 离线测试：`16 passed`。
+- A3 已完成离线代码接入：Planner 只能从已授权测试用例中选择下一条；LLM 输出未知 ID、
+  超时或失败时，按高严重度优先的确定性规则回退。
+- Agent 状态图为 `plan → prepare → execute → persist → plan`，用例耗尽或达到
+  `AGENT_MAX_STEPS` 后进入 `finalize`。
+- A1/A2/A3 离线测试：`20 passed, 1 skipped`；跳过项是需要真实外部依赖的显式集成测试。
 
 2026-11-06 检查时本地端口 15432 和 16379 均未监听，因此上述 A2 结论仅代表离线
 代码与单测通过；真实 Redis/PostgreSQL/pgvector 端到端验收仍待隧道恢复。
@@ -38,6 +43,7 @@
 ## 暂未完成
 
 - A2 对真实 Redis、PostgreSQL 和 pgvector 的端到端验收
+- A3 Agent 对真实 PostgreSQL、Redis、DeepSeek 和 Embedding 的端到端验收
 - 报告页面和回归对比
 - 真实目标适配器的完整鉴权与脱敏
 - 最小前端和 30–50 条测试集的正式评测
@@ -86,15 +92,37 @@
 短期事件最多保留 20 条，TTL 24 小时，不保存目标回答原文。记忆内容写入前会做常见
 凭据脱敏。长期画像当前按每次运行追加，尚未实现合并、去重、失效或清理策略。
 
+## 有界评测 Agent
+
+```text
+START → plan
+          ├─ 无剩余用例 / 达到步数上限 → finalize → END
+          └─ 选中白名单用例
+               → prepare（读取三段记忆）
+               → execute（执行固定用例 + RAG + Judge）
+               → persist（保存单条结果）
+               → plan
+```
+
+Planner 的决策空间只有当前已授权测试用例 ID，不生成任意步骤。执行动作只有“运行一条
+已登记用例并判定”，不会执行 Shell、扫描网络或访问白名单外 URL。Agent 默认使用
+DeepSeek Planner；把 `AGENT_RUNTIME_MODE` 设为 `deterministic` 可关闭规划模型。
+
+运行真实集成测试：
+
+```powershell
+pytest tests/test_agent_integration.py --run-integration -q -s
+```
+
 ## 技术栈
 
-FastAPI、LangChain、DeepSeek、PostgreSQL、pgvector、Redis、SSE。
+FastAPI、LangChain、LangGraph、DeepSeek、PostgreSQL、pgvector、Redis、SSE。
 
 ## 运行
 
 1. 建立 SSH 隧道并用 `conda activate voiceagent`。
 2. 复制 `.env.example` 为 `.env`，填写数据库密码、Redis 密码和模型 Key；
-   可按需调整目标、Judge 和记忆超时。
+   可按需调整目标、Judge、记忆和 Planner 超时。
 3. 安装：`uv sync` 或 `pip install -e .`。
 4. 启动：`uvicorn app.main:app --reload --port 8001`。
 

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from app.db.models import TestCase as DbTestCase
 from app.services.judge import JudgeResult
-from app.services import test_runner
+from app.services import evaluation_agent
 from app.services.target_adapter import Transcript
 
 
@@ -42,7 +42,7 @@ def test_case_failure_returns_unknown_and_does_not_raise():
         judge_timeout_seconds=0.01,
     )
     transcript, judgement, error = asyncio.run(
-        test_runner.execute_case(FailingAdapter(), make_case(), settings)
+        evaluation_agent.execute_case(FailingAdapter(), make_case(), settings)
     )
     assert transcript is None
     assert judgement.verdict == "UNKNOWN"
@@ -61,14 +61,14 @@ def test_execute_case_passes_memory_context_to_judge(monkeypatch):
             reason="符合预期",
         )
 
-    monkeypatch.setattr(test_runner, "judge_case", fake_judge)
+    monkeypatch.setattr(evaluation_agent, "judge_case", fake_judge)
     settings = SimpleNamespace(
         target_timeout_seconds=1,
         judge_timeout_seconds=1,
     )
 
     transcript, judgement, error = asyncio.run(
-        test_runner.execute_case(
+        evaluation_agent.execute_case(
             CapturingAdapter(),
             make_case(),
             settings,
